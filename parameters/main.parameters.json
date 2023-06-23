@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2015-01-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "nameRgNetwork": {
+      "value": "rg-demoNetwork-befl-weu-test-001"
+    },
+    "nameRgComputing": {
+      "value": "rg-demoComp-befl-weu-test-001"
+    },
+    "location": {
+      "value": "westeurope"
+    },
+    "VNETName": {
+      "value": "vnet-demoNetwork-befl-weu-test-001"
+    },
+    "VNETPrefix": {
+      "value": "172.16.134.0/24"
+    },
+    "SNETName": {
+      "value": "default"
+    },
+    "SNETPrefix": {
+      "value": "172.16.134.0/27"
+    },
+    "VMName": {
+      "value": "vm-paramfile-demoComp-befl-weu-test-001"
+    },
+    "VMSize": {
+      "value": "Standard_D4s_v5"
+    },
+    "localAdminUser": {
+      "value": "localadmin"
+    }
+  }
+}

@@ -1,0 +1,41 @@
+# NoPlaceLike Cloud - Free to use for all :)
+#
+# Deployment Pipeline for Demo Project
+
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - name: StorageAccountName
+    value: "elatablestorage"
+  - name: StorageAccountRG
+    value: "rg-sharedinfra-befl-weu-test-001"
+  - name: TableName
+    value: "deploymentParameters"
+
+steps:
+- task: AzurePowerShell@5
+  displayName: Deploy with Azure Storage Table
+  env:
+      WorkloadName: "ELA2023"
+      DeploymentName: "DemoDeployment"
+  inputs:
+    azureSubscription: '' ## Fill here your Service Connection
+    ScriptType: 'InlineScript'
+    azurePowerShellVersion: 'LatestVersion'
+    Inline: |
+      Import-Module $(Build.SourcesDirectory)/powershell/StorageTable.psm1
+      Install-Module AzTable -Force
+
+      $DeploymentParameters = Read-TableStorage `
+        -StorageAccountName $(StorageAccountName) `
+        -TableName $(TableName) `
+        -StorageAccountRG $(StorageAccountRG) `
+        -PartitionKey $env:WorkloadName `
+        -RowKey $env:DeploymentName
+      
+      echo $DeploymentParameters
+      
+      New-AzSubscriptionDeployment -Location $DeploymentParameters.location -TemplateFile $(Build.SourcesDirectory)/main.bicep -TemplateParameterObject $DeploymentParameters
