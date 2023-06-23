@@ -1,0 +1,118 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger: none
+
+variables:
+  - name: AzureSVCConnection
+    value: 'SP - Axians Tech - VSE BEFL'
+  - name: IPAM_URL
+    value: "https://nplcipm-qgqx27h4byywo.azurewebsites.net"
+  - name: IPAM_SPACE
+    value: "ELA 2023 Demo Environment"
+  - name: IPAM_BLOCK
+    value: "DemoDeployment"
+
+pool:
+  vmImage: ubuntu-latest
+
+steps:
+- task: UniversalPackages@0
+  displayName: Get Module VM
+  inputs:
+    command: 'download'
+    downloadDirectory: '$(System.DefaultWorkingDirectory)/modules'
+    feedsToUse: 'internal'
+    vstsFeed: '8a164210-c64e-459d-a85d-9ff86e22d648/0b56d169-f106-4a60-92bb-1a720c1cb848'
+    vstsFeedPackage: 'b72c0ef4-5336-4f11-aa01-a46bd9783579'
+    vstsPackageVersion: '0.0.1'
+
+- task: UniversalPackages@0
+  displayName: Get Module VNET
+  inputs:
+    command: 'download'
+    downloadDirectory: '$(System.DefaultWorkingDirectory)/modules'
+    feedsToUse: 'internal'
+    vstsFeed: '8a164210-c64e-459d-a85d-9ff86e22d648/0b56d169-f106-4a60-92bb-1a720c1cb848'
+    vstsFeedPackage: '78d1370e-d2ed-466d-ae5c-3f72930da54d'
+    vstsPackageVersion: '0.0.1'
+- task: AzurePowerShell@5
+  displayName: Get IP Ranges for VM
+  inputs:
+    azureSubscription: $(AzureSVCConnection)
+    ScriptType: 'InlineScript'
+    azurePowerShellVersion: 'LatestVersion'
+    Inline: |
+      $token = (Get-AzAccessToken -ResourceUrl "api://a086e142-bba2-4e7c-9b25-472e9d1f6058").Token
+
+      $url = "$(IPAM_URL)/api/tools/nextAvailableVNet"
+      $body = @{
+        space = "$(IPAM_SPACE)"
+        blocks = @("$(IPAM_BLOCK)")
+        size = 24
+        reverse_search = $false
+        smallest_cidr = $false
+      } | ConvertTo-Json
+
+      $headers = @{
+        "Authorization" = "Bearer " + $token
+        "Content-Type" = "application/json"
+      }
+
+      $response = Invoke-RestMethod -Uri $url -Method POST -Headers $headers -Body $body
+
+      $VNetIpRange = $response.cidr
+
+      $SnetCidr = "/28"
+
+      $pattern = "/(\d{1,2})$"  # Regular expression pattern to match the CIDR at the end of the string
+      $replacement = $SnetCidr
+
+      $SnetIpRange = $VNetIpRange -replace $pattern, $replacement
+
+      Write-Host "##vso[task.setvariable variable=VNetIpRange]$VNetIpRange"
+      Write-Host "##vso[task.setvariable variable=SnetIpRange]$SnetIpRange"
+      
+
+- task: AzurePowerShell@5
+  displayName: Deploy Template
+  env:
+    WorkloadName: $(WorkloadName)
+    Location: $(Location)
+    VmSize: $(VMSize)
+    VnetRange: $(VNetIpRange)
+    SnetRange: $(SnetIpRange)
+  inputs:
+    azureSubscription: $(AzureSVCConnection)
+    ScriptType: 'InlineScript'
+    azurePowerShellVersion: 'LatestVersion'
+    workingDirectory: $(System.DefaultWorkingDirectory)
+    Inline: |
+      
+      $params = @{
+        'VMName' = "vm-$(WorkloadName)-befl-weu-test-001"
+        'location' = "$(Location)"
+        'VNETPrefix' = "$(VNetIpRange)"
+        'SNETPrefix' = "$(SnetIpRange)"
+        'VMSize' = "$(VMSize)"
+        'localAdminUser' = "$(localadmin_username)"
+        'VNETName' = "vnet-$(WorkloadName)-befl-weu-test-001"
+        'SNETName' = "default"
+        'nameRgNetwork' = "rg-$(WorkloadName)-network-befl-weu-test-001"
+        'nameRgComputing' = "rg-$(WorkloadName)-compute-befl-weu-test-001"
+      }
+
+      $deployment = New-AzDeployment `
+          -TemplateFile './main.bicep' `
+          -TemplateParameterObject $params `
+          -Location "$(Location)"
+      
+      $jsonParam = $params | ConvertTo-Json -Depth 100 | Out-File -FilePath $(Build.ArtifactStagingDirectory)/deployment_parameters.json -Encoding utf8 -Force
+
+- task: PublishBuildArtifacts@1
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'deploymentParameters'
+    publishLocation: 'Container'

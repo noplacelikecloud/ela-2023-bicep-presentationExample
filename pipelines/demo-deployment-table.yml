@@ -1,0 +1,60 @@
+# NoPlaceLike Cloud - Free to use for all :)
+#
+# Deployment Pipeline for Demo Project
+
+trigger: none
+
+pool:
+  vmImage: ubuntu-latest
+
+variables:
+  - name: StorageAccountName
+    value: "elatablestorage"
+  - name: StorageAccountRG
+    value: "rg-sharedinfra-befl-weu-test-001"
+  - name: TableName
+    value: "deploymentParameters"
+
+steps:
+- task: UniversalPackages@0
+  displayName: Get Module VM
+  inputs:
+    command: 'download'
+    downloadDirectory: '$(System.DefaultWorkingDirectory)/modules'
+    feedsToUse: 'internal'
+    vstsFeed: '8a164210-c64e-459d-a85d-9ff86e22d648/0b56d169-f106-4a60-92bb-1a720c1cb848'
+    vstsFeedPackage: 'b72c0ef4-5336-4f11-aa01-a46bd9783579'
+    vstsPackageVersion: '0.0.1'
+
+- task: UniversalPackages@0
+  displayName: Get Module VNET
+  inputs:
+    command: 'download'
+    downloadDirectory: '$(System.DefaultWorkingDirectory)/modules'
+    feedsToUse: 'internal'
+    vstsFeed: '8a164210-c64e-459d-a85d-9ff86e22d648/0b56d169-f106-4a60-92bb-1a720c1cb848'
+    vstsFeedPackage: '78d1370e-d2ed-466d-ae5c-3f72930da54d'
+    vstsPackageVersion: '0.0.1'
+- task: AzurePowerShell@5
+  displayName: Deploy with Azure Storage Table
+  env:
+      WorkloadName: "ELA2023"
+      DeploymentName: "DemoDeployment"
+  inputs:
+    azureSubscription: 'SP - Axians Tech - VSE BEFL' ## Fill here your Service Connection
+    ScriptType: 'InlineScript'
+    azurePowerShellVersion: 'LatestVersion'
+    Inline: |
+      Import-Module $(Build.SourcesDirectory)/powershell/StorageTable.psm1
+      Install-Module AzTable -Force
+
+      $DeploymentParameters = Read-TableStorage `
+        -StorageAccountName $(StorageAccountName) `
+        -TableName $(TableName) `
+        -StorageAccountRG $(StorageAccountRG) `
+        -PartitionKey $env:WorkloadName `
+        -RowKey $env:DeploymentName
+      
+      echo $DeploymentParameters
+      
+      New-AzSubscriptionDeployment -Location $DeploymentParameters.location -TemplateFile $(Build.SourcesDirectory)/main.bicep -TemplateParameterObject $DeploymentParameters
