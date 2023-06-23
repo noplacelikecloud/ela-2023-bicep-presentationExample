@@ -41,7 +41,7 @@ steps:
       WorkloadName: "ELA2023"
       DeploymentName: "DemoDeployment"
   inputs:
-    azureSubscription: 'SP - Axians Tech - VSE BEFL' ## Fill here your Service Connection
+    azureSubscription: '' ## Fill here your Service Connection
     ScriptType: 'InlineScript'
     azurePowerShellVersion: 'LatestVersion'
     Inline: |

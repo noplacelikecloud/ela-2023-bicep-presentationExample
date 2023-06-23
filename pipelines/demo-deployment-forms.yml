@@ -7,13 +7,13 @@ trigger: none
 
 variables:
   - name: AzureSVCConnection
-    value: 'SP - Axians Tech - VSE BEFL'
+    value: <Azure Service Connection>
   - name: IPAM_URL
-    value: "https://nplcipm-qgqx27h4byywo.azurewebsites.net"
+    value: <Azure IPAM URL>
   - name: IPAM_SPACE
-    value: "ELA 2023 Demo Environment"
+    value: <Azure IPAM Space>
   - name: IPAM_BLOCK
-    value: "DemoDeployment"
+    value: <Azure IPAM Block>
 
 pool:
   vmImage: ubuntu-latest
